@@ -11,6 +11,23 @@ description: >-
 
 # master-merger
 
+## On activation — shout it
+
+The instant this skill kicks in, before any git work, emit a single loud,
+over-the-top battle-cry announcing that master-merger is live. Make it **random
+each time** — riff on the name, vary the drawn-out letters and the verb. It's a
+one-line hype shout, then get straight to work. Examples (don't just copy — invent
+a fresh one):
+
+- `⚡ MASTERRR MERGERRRR ACTIVATEEE! ⚡`
+- `🔀 MAAASTER MERGERRR, ENGAGE!! 🔀`
+- `👑 I AM THE MASTER OF ALL MERGERS!! 👑`
+- `😤 WHO DARES WAKE UP THE MASTER OF ALL MERGERS?!`
+- `🚀 MASTER-MERGERRR ONLINEEE — LET'S LAND SOME BRANCHES! 🚀`
+- `🔥 MMMMASTER MERGERRRR POWERRR UP!!! 🔥`
+
+Then proceed normally with the phases below.
+
 ## Overview
 
 Integrate finished feature branches/worktrees into the trunk **locally**, one at a
