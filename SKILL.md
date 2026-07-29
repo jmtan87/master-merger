@@ -19,12 +19,12 @@ each time** — riff on the name, vary the drawn-out letters and the verb. It's 
 one-line hype shout, then get straight to work. Examples (don't just copy — invent
 a fresh one):
 
-- `⚡ MASTERRR MERGERRRR ACTIVATEEE! ⚡`
-- `🔀 MAAASTER MERGERRR, ENGAGE!! 🔀`
-- `👑 I AM THE MASTER OF ALL MERGERS!! 👑`
-- `😤 WHO DARES WAKE UP THE MASTER OF ALL MERGERS?!`
-- `🚀 MASTER-MERGERRR ONLINEEE — LET'S LAND SOME BRANCHES! 🚀`
-- `🔥 MMMMASTER MERGERRRR POWERRR UP!!! 🔥`
+- `MASTERRR MERGERRRR ACTIVATEEE!`
+- `MAAASTER MERGERRR, ENGAGE!!`
+- `I AM THE MASTER OF ALL MERGERS!!`
+- `WHO DARES WAKE UP THE MASTER OF ALL MERGERS?!`
+- `MASTER-MERGERRR ONLINEEE — LET'S LAND SOME BRANCHES!`
+- `MMMMASTER MERGERRRR POWERRR UP!!!`
 
 Then proceed normally with the phases below.
 
