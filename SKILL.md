@@ -166,6 +166,25 @@ run the affected tests, then stage-by-path + commit.
 
 ## Phase 3 — Verify gate (after all merges)
 
+**First, sync dependencies if any merge touched the manifest/lockfile.** A merge that
+lands new deps leaves the trunk checkout's installed packages **stale**, and letting a
+stale tree get relinked mid-verify is how `node_modules` gets corrupted (half-removed
+`.bin/`, empty packages) — especially on **pnpm + Windows**, where packages are
+hard-links/junctions into a global store and any file lock aborts the relink partway.
+Do it deliberately, with locks cleared:
+
+```bash
+git diff --name-only HEAD@{1} HEAD | grep -E 'package\.json|pnpm-lock\.yaml|yarn\.lock|package-lock\.json' \
+  && echo "deps changed — sync before verifying"
+# 1. STOP any dev server first (it locks node_modules/.bin/* → aborts the relink).
+# 2. Install from the lockfile exactly (no resolution drift), with the repo's PM:
+pnpm install --frozen-lockfile
+```
+
+If that install **errors partway**, treat `node_modules` as poisoned — a plain re-run
+won't repair it (lockfile-trust makes pnpm skip the half-written tree). Wipe and reinstall:
+`rm -rf node_modules && pnpm install --frozen-lockfile`. Only then run the gate.
+
 Test/type runs from the trunk checkout often **crawl sibling worktrees** (inflated
 counts, stale copies). Exclude them so the signal is trunk-only. Both the test
 suite and the type/lint gate must be **green before any cleanup**:
@@ -210,6 +229,10 @@ git worktree unlock  "<wt>"        # locked worktrees only
 git worktree remove "<wt>" || git worktree remove --force "<wt>"   # escalate ONLY
 #    once step 1 confirms the block is build output / a stale lock, not source
 [ -d "<wt>" ] && rm -rf "<wt>"     # git often leaves the dir behind
+#    Windows caveat: prefer `git worktree remove` to clear the dir — Git-Bash `rm -rf`
+#    can FOLLOW a pnpm junction (node_modules/<pkg> → the store) and delete shared
+#    content instead of just unlinking. If you must rm, ensure the worktree has no
+#    live node_modules links first.
 git worktree prune
 git branch -d <branch>             # -d = merged-only safety; refuses unmerged
 ```
@@ -248,6 +271,10 @@ a newly-merged API). If you maintain project memory, record each feature as merg
   is what fooled the sweep — check the pid, not the tree.)
 - Merging a branch whose worktree has uncommitted source → not finished; leave it.
 - Cleaning up before the verify gate is green → verify first.
+- Verifying (or restarting the app) after a lockfile-changing merge **without syncing
+  deps** → stop the dev server, `pnpm install --frozen-lockfile`, THEN verify. A stale
+  tree relinked under a file lock corrupts `node_modules`; a partial install won't
+  self-repair — wipe and reinstall.
 - `git branch -D` (force) to delete a branch that "won't delete" → `-d` refused
   because it's **not merged**; investigate, don't force.
 - Test run reporting a huge/weird file count → you forgot the worktree `--exclude`
