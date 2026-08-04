@@ -37,9 +37,13 @@ sibling worktrees, the whole procedure is written to avoid stepping on live
 sessions and to avoid sweeping their untracked files into commits.
 
 **Core principle:** merge deliberately and verify continuously. A branch is a
-candidate only when it is *finished* (clean worktree, not held by a live session)
-and *ahead of* trunk. Never `git add -A` during a merge. Never force-remove a
-worktree a live session still holds.
+candidate only when it is *finished* and *ahead of* trunk. **Finished means the
+holding session has ended** — a clean, fully-committed worktree is NOT enough: a
+live session commits each slice as it goes, so a spotless tree held by a **live
+lock** is a session *between tasks*, not a done one. A live lock is a **hard
+exclusion** that "merge all / merge everything" does **not** override — you skip
+it and report it. Never `git add -A` during a merge. Never force-remove a worktree
+a live session still holds.
 
 This skill is repo-agnostic; where it names a concrete tool/file (`pnpm`,
 `STATUS.md`), treat it as an example and substitute the current repo's equivalent.
@@ -70,9 +74,16 @@ done
 git worktree list        # note which worktrees are 'locked'
 ```
 
-Classify each branch:
+Classify each branch on **two** axes — commits AND liveness (check both now, not at
+merge time):
 - **ahead 0** → nothing to merge. Skip (empty/abandoned, or already merged).
-- **ahead > 0** → candidate. Confirm it's *finished* before merging (Phase 2 gate).
+- **live-locked worktree** (lock pid still running) → **NOT a candidate, whatever the
+  ahead count.** A running session owns it; leave it and report it. Detect it here:
+  ```bash
+  git worktree list --porcelain    # lock lines carry the pid: "locked ... pid <N>"
+  ps -p <N> 2>/dev/null && echo LIVE || echo dead   # Windows: Get-Process -Id <N>
+  ```
+- **ahead > 0 and not live-locked** → candidate. Confirm it's *finished* at the Phase 2 gate.
 
 ## Phase 1 — Pre-flight (clean tree + baseline green)
 
@@ -95,18 +106,30 @@ Classify each branch:
 merges without conflict — do those first. Otherwise order only affects how many
 conflicts you touch; foundational branches before their consumers reduces churn.
 
-**Per-branch finished-gate (must pass before merging a concurrent-session branch):**
+**Per-branch finished-gate — ALL must pass before merging a concurrent-session branch.**
+
+**Gate 1 — the lock is not live (check FIRST; it overrides every other signal).**
+```bash
+git worktree list --porcelain   # find "locked ... pid <N>" for this worktree
+ps -p <N> 2>/dev/null && echo LIVE || echo dead   # Windows: Get-Process -Id <N>
+```
+A **live** pid = the session is mid-flight → **STOP: do not merge, report it, move on.**
+This holds *even when the worktree is spotless and every commit is in* — a live session
+commits each task as it finishes and is working on the next, so a clean tree is **not**
+consent to merge. "Merge all / merge everything" does **not** waive this gate. Only a
+**stale** lock (pid dead) clears it — that means abandoned/finished work, a real candidate.
+
+**Gate 2 — no uncommitted source in the worktree.**
 ```bash
 wt="<path from git worktree list>"
 git -C "$wt" status --porcelain | grep -vE '\.next|node_modules|dist|target|test-results'   # must be empty
-git worktree list --porcelain | grep -A3 "<name>" | grep -i locked                          # note if locked
-# if locked, is the locking session ALIVE?
-git worktree list --porcelain   # lock reasons often carry a pid; then:
-ps -p <pid>                      # ALIVE → not yours to merge; leave it
 ```
-If the worktree has uncommitted work or is **locked by a live session**, it isn't
-finished — leave it and report it. A **stale** lock (pid dead) means abandoned/
-finished work — safe to treat as a candidate.
+
+**Gate 3 — the branch ref isn't moving under you.** If `git rev-parse <branch>` is *ahead
+of* the worktree's HEAD, or changes between your read and your merge, a session is actively
+committing to that branch → treat it as live and back off. (Seen for real: a branch head
+advanced one commit past the worktree between detection and merge — the tell of a live
+session.)
 
 **Merge:**
 ```bash
@@ -215,8 +238,15 @@ a newly-merged API). If you maintain project memory, record each feature as merg
 - About to `git add -A` / `git add .` mid-merge → stage resolved files by path.
 - About to `git worktree remove --force` → check the pid is dead AND step-1 rescue
   is clean first.
-- Merging a branch whose worktree has uncommitted changes or is live-locked → it's
-  not finished; leave it.
+- Merging a branch whose worktree is **live-locked** (lock pid alive) → **hard stop,
+  never merge it** — even under "merge all", even if the tree is spotless and fully
+  committed. A live session commits slice-by-slice; merging its branch mid-plan lands a
+  *partial* feature and makes the status doc you write falsely claim it's done. (Real
+  incident: a sweep merged an in-progress `corporate-actions` branch — 1 of 5 planned
+  tasks — into main, destroyed the live session's worktree, and wrote a "merged ✅" row
+  for a feature that barely existed. The tree was clean; the lock was live. The clean tree
+  is what fooled the sweep — check the pid, not the tree.)
+- Merging a branch whose worktree has uncommitted source → not finished; leave it.
 - Cleaning up before the verify gate is green → verify first.
 - `git branch -D` (force) to delete a branch that "won't delete" → `-d` refused
   because it's **not merged**; investigate, don't force.
@@ -232,7 +262,8 @@ git fetch --all --prune; TRUNK=main
 for b in $(git for-each-ref --format='%(refname:short)' refs/heads/ | grep -v "^$TRUNK$"); do
   echo "$b: ahead $(git rev-list --count $TRUNK..$b) / behind $(git rev-list --count $b..$TRUNK)"; done
 
-# per branch: finished-gate (clean + lock/pid) → merge → resolve BY PATH (never -A) → commit --no-edit
+# per branch: finished-gate (pid-not-live FIRST → clean tree → ref not moving) → merge → resolve BY PATH (never -A) → commit --no-edit
+# live lock = hard skip, even under "merge all", even if the tree is spotless
 git merge --no-ff <branch> -m "Merge branch '<short>' (<what>)"
 
 # verify (trunk-only) with the repo's runner, excluding sibling worktrees, then reconcile status doc
