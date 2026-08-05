@@ -253,8 +253,17 @@ investigate, don't reach for `-D`.
 Report: what merged (with conflicts resolved), the green gate numbers, what you
 deliberately left (live-locked worktrees, empties), and that nothing was pushed.
 Note any cross-branch follow-up you spotted (e.g. a consumer that should now adopt
-a newly-merged API). If you maintain project memory, record each feature as merged
-(date + merge sha) and flip any "unmerged" notes.
+a newly-merged API).
+
+**The merge record belongs in git + `docs/superpowers/STATUS.md`, NOT in project
+memory.** Flip the feature's STATUS.md row at the merge boundary (that is the single
+reconciliation point for "what's built"); `git log` + the merge sha already hold the
+rest. Do **not** mint a per-branch "X MERGED (date + sha)" memory file — that bloats
+the always-loaded MEMORY.md index with facts git already records, and the harness
+memory rules say not to save what the repo already knows. Write project memory ONLY
+when the merge surfaced something git can't give you — a genuine **parked/deferred
+follow-up** or a **locked cross-branch decision** — and even then as a single concise
+line, folded into the relevant domain memory, never a new file per branch.
 
 ## Red flags — STOP
 
